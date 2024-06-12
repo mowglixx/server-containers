@@ -27,7 +27,7 @@ services:
         # Run the updater with user ID 1000
       - PGID=1000
         # Run the updater with group ID 1000
-      - CF_API_TOKEN__FILE=/run/secrets/CF_API_TOKEN
+      - CF_API_TOKEN_FILE=/run/secrets/CF_API_TOKEN
         # Your Cloudflare API token
       - DOMAINS=example.org,www.example.org,example.io
         # Your domains (separated by commas)
