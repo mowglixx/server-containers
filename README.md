@@ -15,7 +15,7 @@ cd media
 docker compose up -d
 ```
 
-### Advise
+### Advice
 
 I advise you start the containers and setup in this order:
 
