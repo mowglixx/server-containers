@@ -1,0 +1,80 @@
+
+# 
+# Name:  Traefik
+# Description:  Traffic proxy (better nginx)
+# 
+
+networks:
+  frontend:
+    external: true
+  backend:
+    external: true
+
+#  containers
+services:
+
+  # Traefik container
+  traefik:
+    image: "traefik:v3.0"
+    container_name: traefik
+    restart: always
+    networks:
+      - backend
+      - frontend
+    command:
+      - --log.level=DEBUG
+      - --api.insecure=true
+      ########################################################
+      - --providers.docker=true
+      - --providers.docker.network=frontend
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.docker.exposedbydefault=false
+      ########################################################
+      - --providers.file.directory=/config/dynamic
+      - --providers.file.watch=true
+      ########################################################
+      - --entryPoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=websecure
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      ########################################################
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.websecure.asDefault=true
+      - --entryPoints.websecure.http3
+      - --entryPoints.websecure.http3.advertisedPort=443
+      - --entryPoints.websecure.http.tls.certresolver=cf
+
+      # default maxConcurrentStreams=250
+      # - --entryPoints.websecure.http2.maxConcurrentStreams=250 
+      ########################################################
+      - --entryPoints.streaming.address=:1704/udp
+      ########################################################
+      - --certificatesresolvers.cf.acme.dnschallenge=true
+      - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
+      # Staging URL for Cloudflare DNS-01 Challenge
+      # - --certificatesresolvers.cf.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.cf.acme.email=YOU@EMAIL.COM
+      - --certificatesresolvers.cf.acme.storage=/acme/letsencrypt.json
+
+    ports:
+      - "8080:8080" # Dashboard ui
+      # web
+      - "80:80" # HTTPS domain can't use HTTP 
+      - "443:443"
+      # streaming
+      - "1704:1704/udp"
+    env_file:
+      - traefik.env
+    labels:
+      - portainer.hidden=true
+      - traefik.enable=true
+      - traefik.http.routers.traefik.tls.certresolver=cf
+      - traefik.http.services.traefik.loadBalancer.server.port=8080
+      - traefik.http.routers.traefik.rule=Host(`traefik.YOURDOMAIN.COM`)
+      # - traefik.http.routers.traefik.middlewares=authentik@docker
+      - traefik.http.routers.traefik.entrypoints=websecure
+
+    volumes:
+      - "./config__traefik.certs:/acme"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ./config__traefik.dynamic:/config/dynamic

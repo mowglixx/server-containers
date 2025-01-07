@@ -1,0 +1,204 @@
+
+# 
+# Name:  Media Server stack
+# Description:  Possibly the best setup for media...
+# 
+
+############################################ Volumes
+volumes:
+  cache__jellyfin: 
+
+############################################ Networks
+networks:
+  frontend:
+    external: true
+
+########################################### Services
+services:
+
+  qbittorrent:
+  # Downloader
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=1080
+      - DOCKER_MODS=ghcr.io/gabe565/linuxserver-mod-vuetorrent
+    volumes:
+      - ./config__qbittorrent:/config
+      - ./shared__downloads.complete:/downloads/complete
+      - ./shared__downloads.incomplete:/downloads/incomplete
+      - ./shared__downloads.watch:/downloads/watch
+      - ./shared__downloads.blackhole:/downloads/blackhole
+    ports:
+      - 1080:1080
+      - 1080:1080/udp
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.qbittorrent.entryPoints=websecure
+      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.YOURDOMAIN.COM`)"
+      - traefik.http.routers.qbittorrent.tls.certResolver=cf
+      - traefik.http.services.qbittorrent.loadBalancer.server.port=8080
+      - traefik.http.routers.qbittorrent.middlewares=authentik@docker
+
+  prowlarr:
+  # Indexer
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - AUTO_UPDATE=true #optional
+      - PORT=9696
+      - DOCKER_MODS=ghcr.io/themepark-dev/theme.park:prowlarr
+      - TP_THEME=nord
+    volumes:
+      - ./config__prowlarr/data:/config
+      - ./shared__downloads.blackhole:/downloads
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.YOURDOMAIN.COM`)"
+      - traefik.http.services.prowlarr.loadBalancer.server.port=9696
+      - traefik.http.routers.prowlarr.tls.certResolver=cf
+      - traefik.http.routers.prowlarr.entryPoints=websecure
+      - traefik.http.routers.prowlarr.middlewares=authentik@docker
+
+  radarr:
+  # Movie Requester
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - PORT=7878 #optional
+      - DOCKER_MODS=ghcr.io/themepark-dev/theme.park:radarr
+      - TP_THEME=nord
+    networks:
+      - frontend
+    volumes:
+      - ./config__radarr:/config
+      - ./shared__media/movies:/movies #optional
+      - ./shared__downloads.complete:/downloads/complete #optional
+      - ./shared__downloads.incomplete:/downloads/incomplete #optional
+    depends_on:
+      - qbittorrent
+      - prowlarr
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.radarr.entryPoints=websecure
+      - traefik.http.routers.radarr.tls.certResolver=cf
+      - traefik.http.routers.radarr.middlewares=authentik@docker
+      - "traefik.http.routers.radarr.rule=Host(`radarr.YOURDOMAIN.COM`)"
+      - traefik.http.services.radarr.loadBalancer.server.port=7878
+
+  sonarr:
+  # TV Show Requester
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: always
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - PORT=8989 #optional
+      - DOCKER_MODS=ghcr.io/themepark-dev/theme.park:sonarr
+      - TP_THEME=nord
+    volumes:
+      - ./config__sonarr:/config
+      - ./shared__media/shows:/tv #optional
+      - ./shared__downloads.complete:/downloads/complete #optional
+      - ./shared__downloads.incomplete:/downloads/incomplete #optional
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.YOURDOMAIN.COM`)
+      - traefik.http.services.sonarr.loadBalancer.server.port=8989
+      - traefik.http.routers.sonarr.tls.certResolver=cf
+      - traefik.http.routers.sonarr.entryPoints=websecure
+      - traefik.http.routers.sonarr.middlewares=authentik@docker
+
+  jellyfin:
+  # media server
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: always
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - PORT=8096 #optional
+      - DOCKER_MODS=ghcr.io/themepark-dev/theme.park:jellyfin
+      - TP_THEME=nord
+    ports:
+      - 8096:8096
+      - 1900:1900/udp
+      - 7359:7359/udp
+    volumes:
+      - ./shared__media:/media
+      - ./config__jellyfin:/config
+      - ./config__jellyfin_web:/jellyfin/jellyfin-web
+      - cache__jellyfin:/cache
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.media.entryPoints=websecure
+      - "traefik.http.routers.media.rule=Host(`media.YOURDOMAIN.COM`)"
+      - traefik.http.routers.media.tls.certResolver=cf
+      - traefik.http.services.media.loadBalancer.server.port=8096
+      - traefik.http.services.media.loadBalancer.passHostHeader=true
+      - traefik.http.routers.media.middlewares=media-mw
+      - traefik.http.middlewares.media-mw.headers.customResponseHeaders.X-Robots-Tag=noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex
+      - traefik.http.middlewares.media-mw.headers.frameDeny=true
+      - traefik.http.middlewares.media-mw.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.media-mw.headers.customresponseheaders.X-XSS-PROTECTION=1
+      - traefik.http.middlewares.media-mw.headers.customFrameOptionsValue='allow-from https://media.YOURDOMAIN.COM'
+
+  jellyseerr:
+  # Media requests
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: always
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - LOG_LEVEL=info
+      - TZ=Europe/London
+      - PORT=5055 #optional
+    volumes:
+      - ./config__jellyseerr:/app/config
+      - ./shared__downloads.complete:/downloads/complete:ro #optional
+      - ./shared__downloads.incomplete:/downloads/incomplete:ro #optional
+    depends_on:
+      - jellyfin
+      - prowlarr
+      - qbittorrent
+      - radarr
+      - sonarr
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.jellyseerr.rule=Host(`requests.YOURDOMAIN.COM`)"
+      - traefik.http.services.jellyseerr.loadBalancer.server.port=5055
+      - traefik.http.routers.jellyseerr.tls.certResolver=cf
+      - traefik.http.routers.jellyseerr.entryPoints=websecure
+      - traefik.http.routers.jellyseerr.middlewares=authentik@docker

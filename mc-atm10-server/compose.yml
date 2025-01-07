@@ -1,0 +1,33 @@
+
+# 
+# Name:  ATM 10 Minecraft Server
+# Description:  ATM 10 Modpack installed in a container
+# 
+
+services:
+  mc:
+    image: itzg/minecraft-server
+    tty: true
+    stdin_open: true
+    restart: always
+    ports:
+      - "25565:25565"
+    env_file: ./cf_api.env
+    environment:
+      PUID: 1000
+      PGID: 1000
+      EULA: true
+      MOD_PLATFORM: AUTO_CURSEFORGE
+
+      CF_SLUG: all-the-mods-10
+      MEMORY: 6G
+      CF_OVERRIDES_EXCLUSIONS: |
+        shaderpacks/**
+    networks:
+      - frontend
+    volumes:
+      - ./data:/data
+
+networks:
+  frontend:
+    external: true

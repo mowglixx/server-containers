@@ -1,0 +1,28 @@
+
+# 
+# Name:  Factorio Server
+# Description:  Simple Factorio server with a few mods
+# 
+                                    
+services:
+  factorio:
+    container_name: factorio
+    image: factoriotools/factorio:1.1.110
+    restart: unless-stopped
+    networks:
+      - frontend
+    ports:
+      - "34197:34197/udp"
+      - "27015:27015/tcp"
+    volumes:
+    - ./server:/factorio
+    # make sure the file exists before starting the server
+    - ./server-settings.json:/server-settings.json
+    env_file:
+      - factorio.env
+    entrypoint: /bin/sh -c "mkdir -p /factorio/config && envsubst < ./server-settings.json > /factorio/config/server-settings.json && exec /docker-entrypoint.sh"
+
+
+networks:
+  frontend:
+    external: true

@@ -1,0 +1,58 @@
+
+# 
+# Name:  Bookstack
+# Description:  Write documentation for your users
+# 
+
+services:
+  docs:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: docs
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - APP_URL=https://docs.YOURDOMAIN.COM
+      - DB_HOST=docs_db
+      - DB_PORT=3306
+      - DB_USER=GENERATEYOUROWN
+      - DB_PASS=GENERATEYOUROWN
+      - DB_DATABASE=db_docs
+    volumes:
+      - ./config__docs:/config
+    depends_on:
+      - docs_db
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.docs.rule=Host(`docs.YOURDOMAIN.COM`)
+      - traefik.http.services.docs.loadBalancer.server.port=80
+      - traefik.http.routers.docs.tls.certResolver=cf
+      - traefik.http.routers.docs.entryPoints=websecure
+      - traefik.http.routers.docs.middlewares=authentik@docker
+    networks:
+      - frontend
+      - backend
+
+  docs_db:
+    image: lscr.io/linuxserver/mariadb:latest
+    container_name: docs_db
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - MYSQL_ROOT_PASSWORD=GENERATEYOUROWN
+      - MYSQL_DATABASE=db_docs
+      - MYSQL_USER=GENERATEYOUROWN
+      - MYSQL_PASSWORD=GENERATEYOUROWN
+    volumes:
+      - ./config__docs_db:/config
+    networks:
+      - backend
+
+networks:
+  frontend:
+    external: true
+  backend:
+    external: true

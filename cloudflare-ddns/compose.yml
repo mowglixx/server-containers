@@ -1,0 +1,27 @@
+
+# 
+# Name:  SAMPLE
+# Description:  SAMPLE
+# 
+
+services:
+  service:
+    image: favonia/cloudflare-ddns:latest
+    container_name: cloudflare-ddns-service
+    restart: always
+    # Restart the updater after reboot
+    cap_add:
+      - SETUID
+        # Capability to change user ID; needed for using PUID
+      - SETGID
+        # Capability to change group ID; needed for using PGID
+    cap_drop:
+      - all
+      # Drop all other capabilities
+    read_only: true
+    # Make the container filesystem read-only
+    security_opt:
+      - no-new-privileges:true
+        # Another protection to restrict superuser privileges
+    env_file:
+      - cloudflare.env

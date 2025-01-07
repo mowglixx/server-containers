@@ -1,0 +1,36 @@
+# 
+# Name:  Technitium DNS
+# Description:  Simple but complete DNS Server for local hostname resolution
+# 
+
+services:
+  server:
+    container_name: dns
+    hostname: dns
+    image: technitium/dns-server:latest
+    restart: always
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65000
+    ports:
+      - "5380:5380/tcp" #DNS web console (HTTP)
+      - "53:53/udp" #DNS service
+      - "53:53/tcp" #DNS service
+      - "853:853/tcp" #DNS-over-TLS service  
+    env_file:
+      - dns.env
+    volumes:
+      - ./config:/etc/dns
+    networks:
+      - frontend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dns-server.rule=Host(`dns.YOURDOMAIN.COM`)
+      - traefik.http.routers.dns-server.entrypoints=websecure
+      - traefik.http.services.dns-server.loadbalancer.server.port=5380
+      - traefik.http.routers.dns-server.tls.certresolver=cf
+      - traefik.http.routers.dns-server.middlewares=authentik@docker
+      - portainer.hidden=true
+
+networks:
+  frontend:
+    external: true

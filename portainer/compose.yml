@@ -1,0 +1,34 @@
+
+# 
+# Name:  Portainer
+# Description:  Simple Container managment
+# Heads-up: at the time of writting this, you have to login quickly when you 
+#           have first started to container as you only have 30? mins to 
+#           setup the admin password before you have to restart it to retry... 
+#           good? 
+# 
+
+services:
+  app:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    networks:
+      - frontend
+    volumes:
+      - data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - portainer.hidden=true
+      - traefik.enable=true
+      - traefik.http.routers.portainer.rule=Host(`containers.YOURDOMAIN.COM`)
+      - traefik.http.routers.portainer.entrypoints=websecure
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+      - traefik.http.routers.portainer.tls.certresolver=cf
+      
+volumes:
+  data:
+
+networks:
+  frontend:
+    external: true

@@ -1,0 +1,37 @@
+
+# 
+# Name:  Syncthing
+# Description:  D2D E2E Syncronisation node
+# 
+
+networks:
+  frontend:
+    external: true
+
+services:
+  syncthing:
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    restart: unless-stopped
+    hostname: mario #optional
+    networks:
+      - frontend
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+    volumes:
+      - ./config__synchthing:/config
+      - /data__syncthing:/data__syncthing
+    ports:
+      # - 8384:8384
+      - 22000:22000/tcp
+      - 22000:22000/udp
+      - 21027:21027/udp
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.syncthing.rule=Host(`syncthing.YOURDOMAIN.COM`)
+      - traefik.http.services.syncthing.loadBalancer.server.port=8384
+      - traefik.http.routers.syncthing.entrypoints=websecure
+      - traefik.http.routers.syncthing.tls.certresolver=cf
+      - traefik.http.routers.syncthing.middlewares=authentik@docker

@@ -1,0 +1,107 @@
+
+# 
+# Name:  Paperless-ngx
+# Description:  Open source document managment for backup of important documents
+# 
+
+networks:
+  backend:
+    external: true
+  frontend:
+    external: true
+
+volumes:
+  paperless__data__broker:
+
+services:
+  broker:
+    image: docker.io/library/redis:7
+    container_name: paperless_redis
+    restart: unless-stopped
+    volumes:
+      - paperless__data__broker:/data
+    networks:
+      - backend
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    depends_on:
+      - broker
+    environment:
+       # The UID and GID of the user used to run paperless in the container. Set this
+       # to your UID and GID on the host so that you have write access to the
+       # consumption directory.
+      USERMAP_UID: 1000
+      USERMAP_GID: 1000
+       # Additional languages to install for text recognition, separated by a
+       # whitespace. Note that this is
+       # different from PAPERLESS_OCR_LANGUAGE (default=eng), which defines the
+       # language used for OCR.
+       # The container installs English, German, Italian, Spanish and French by
+       # default.
+       # See https://packages.debian.org/search?keywords=tesseract-ocr-&searchon=names&suite=buster
+       # for available languages.
+      PAPERLESS_OCR_LANGUAGES: eng
+       ###############################################################################
+       # Paperless-specific settings                                                 #
+       ###############################################################################
+       # All settings defined in the paperless.conf.example can be used here. The
+       # Docker setup does not use the configuration file.
+       # A few commonly adjusted settings are provided below.
+       # This is required if you will be exposing Paperless-ngx on a public domain
+       # (if doing so please consider security measures such as reverse proxy)
+      PAPERLESS_URL: https://paperless.YOURDOMAIN.COM
+      PAPERLESS_APP_TITLE: BRANDNAMEHERE Paper
+       # Adjust this key if you plan to make paperless available publicly. It should
+       # be a very long sequence of random characters. You don't need to remember it.
+       # - PAPERLESS_SECRET_KEY=change-me
+       # Use this variable to set a timezone for the Paperless Docker containers. If not specified, defaults to UTC.
+      PAPERLESS_TIME_ZONE: Europe/London
+       # The default language to use for OCR. Set this to the language most of your
+       # documents are written in.
+      PAPERLESS_OCR_LANGUAGE: eng
+       # Set if accessing paperless via a domain subpath e.g. https://domain.com/PATHPREFIX and using a reverse-proxy like traefik or nginx
+       # - PAPERLESS_FORCE_SCRIPT_NAME=/PATHPREFIX
+       # - PAPERLESS_STATIC_URL=/PATHPREFIX/static/ # trailing slash required
+      PAPERLESS_REDIS: redis://paperless_redis:6379
+      PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+      PAPERLESS_DISABLE_REGULAR_LOGIN: true
+      PAPERLESS_BIND_ADDR: 0.0.0.0
+      # PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik",
+      # "client_id":"HVMk5X2MitwsBqG8AR12YsscrBqmIVzvM7orMO5t",
+      # "secret":"DQaYijolMd4auWnXpnpUN4eP3pV1arQ2yjvPlxuFtVO2Pxx3VUJZuxOGkW1xr8p4H2aHXT7rWxOmPe4BDLwo7WSJERZCcUFmlSFMcktp2TBy8x8NTm5yJjR5y2skx8FI",
+      # "settings":{"server_url":"https://auth.YOURDOMAIN.COM/application/o/paperless-oidc/.well-known/openid-configuration","token_auth_method":"client_secret_basic"}}]},"OAUTH_PKCE_ENABLED":"True"}'
+      PAPERLESS_SOCIALACCOUNT_PROVIDERS: >
+          {
+            "openid_connect": {
+              "APPS": [
+                {
+                  "provider_id": "authentik",
+                  "name": "Authentik",
+                  "client_id": "HVMk5X2MitwsBqG8AR12YsscrBqmIVzvM7orMO5t",
+                  "secret": "DQaYijolMd4auWnXpnpUN4eP3pV1arQ2yjvPlxuFtVO2Pxx3VUJZuxOGkW1xr8p4H2aHXT7rWxOmPe4BDLwo7WSJERZCcUFmlSFMcktp2TBy8x8NTm5yJjR5y2skx8FI",
+                  "settings": {
+                    "server_url": "https://auth.YOURDOMAIN.COM/application/o/paperless-oidc/.well-known/openid-configuration"
+                  }
+                }
+              ]
+            }
+          }
+    volumes:
+      - ./data__paperless:/usr/src/paperless/data
+      - ./media__paperless:/usr/src/paperless/media
+      - ./export__paperless:/usr/src/paperless/export
+      - ./consume__paperless:/usr/src/paperless/consume
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.paperless.rule=Host(`paperless.YOURDOMAIN.COM`)
+      - traefik.http.routers.paperless.entrypoints=websecure
+      - traefik.http.services.paperless.loadbalancer.server.port=8000
+      - traefik.http.routers.paperless.tls.certresolver=cf
+      - traefik.http.routers.paperless.middlewares=authentik@docker
+    networks:
+      - frontend
+      - backend
+    
